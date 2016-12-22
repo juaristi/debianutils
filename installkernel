@@ -17,7 +17,7 @@ set -e
 
 # Parse the command line options.  Of course, powerpc has to be all
 # different, and passes in a fifth argument, just because it is
-# "special". We ignore the fifth argument, and do not flag is as an
+# "special". We ignore the fifth argument, and do not flag it as an
 # error, which it would be for any arch apart from powerpc
 if [ $# -eq 3 ] || [ $# -eq 4 ] || [ $# -eq 5 ] ; then
   img="$2"
@@ -33,17 +33,48 @@ else
   exit 1
 fi
 
+SUFFIX="old"
+
+prompt_suffix () {
+  if [ $- =~ i ] ; then
+# This shell is not interactive, so exit
+    return
+  fi
+
+  NEED_SUFFIX=false
+
+  for file in "$@" ; do
+    if [ -f "$dir/$file-$ver" ] ; then
+      NEED_SUFFIX=true
+      echo "$dir/$file-$ver will be renamed to $dir/$file-$ver.$SUFFIX"
+    fi
+  done
+
+  if ! $NEED_SUFFIX ; then
+    return
+  fi
+
+  read -p "Enter suffix to be used [$SUFFIX]: " SUFFIX
+  if echo "$SUFFIX" | grep -Eq '^[a-zA-Z0-9]' ; then
+    SUFFIX=".$SUFFIX"
+  elif ! echo "$SUFFIX" | grep -Eq '^\.[a-zA-Z0-9]' ; then
+    echo "Invalid suffix; '.old' will be used"
+    SUFFIX=".old"
+  fi
+  echo
+}
+
 # Create backups of older versions before installing
 updatever () {
   if [ -f "$dir/$1-$ver" ] ; then
-    mv "$dir/$1-$ver" "$dir/$1-$ver.old"
+    mv "$dir/$1-$ver" "$dir/$1-$ver$SUFFIX"
   fi
 
   cat "$2" > "$dir/$1-$ver"
 
   # This section is for backwards compatibility only
   if test -f "$dir/$1" ; then
-    # The presence of "$dir/$1" is unusual in modern intallations, and
+    # The presence of "$dir/$1" is unusual in modern installations, and
     # the results are mostly unused.  So only recreate them if they
     # already existed.
     if test -L "$dir/$1" ; then
@@ -51,13 +82,13 @@ updatever () {
         # we need to.
         if [ "$(readlink -f ${dir}/${1})" = "${dir}/${1}-${ver}" ]; then
             # Yup, we need to change
-            ln -sf "$1-$ver.old" "$dir/$1.old"
+            ln -sf "$1-$ver.$SUFFIX" "$dir/$1.$SUFFIX"
         else
-            mv "$dir/$1" "$dir/$1.old"
+            mv "$dir/$1" "$dir/$1.$SUFFIX"
         fi
         ln -sf "$1-$ver" "$dir/$1"
     else                        # No links
-        mv "$dir/$1" "$dir/$1.old"
+        mv "$dir/$1" "$dir/$1.$SUFFIX"
         cat "$2" > "$dir/$1"
     fi
   fi
@@ -68,14 +99,21 @@ if [ "$(basename $img)" = "vmlinux" ] ; then
 else
   img_dest=vmlinuz
 fi
-updatever $img_dest "$img"
-updatever System.map "$map"
 
+set -x
 config=$(dirname "$map")
 config="${config}/.config"
 if [ -f "$config" ] ; then
+  prompt_suffix $img_dest System.map config
+  updatever $img_dest "$img"
+  updatever System.map "$map"
   updatever config "$config"
+else
+  prompt_suffix $img_dest System.map
+  updatever $img_dest "$img"
+  updatever System.map "$map"
 fi
+set +x
 
 # If installing in the usual directory, run the same scripts that hook
 # into kernel package installation.  Also make sure the PATH includes
