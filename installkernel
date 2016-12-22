@@ -33,11 +33,11 @@ else
   exit 1
 fi
 
-SUFFIX="old"
+SUFFIX=".old"
 
 prompt_suffix () {
   if [ $- =~ i ] ; then
-# This shell is not interactive, so exit
+  # This shell is not interactive, so exit
     return
   fi
 
@@ -82,13 +82,13 @@ updatever () {
         # we need to.
         if [ "$(readlink -f ${dir}/${1})" = "${dir}/${1}-${ver}" ]; then
             # Yup, we need to change
-            ln -sf "$1-$ver.$SUFFIX" "$dir/$1.$SUFFIX"
+            ln -sf "$1-$ver$SUFFIX" "$dir/$1$SUFFIX"
         else
-            mv "$dir/$1" "$dir/$1.$SUFFIX"
+            mv "$dir/$1" "$dir/$1$SUFFIX"
         fi
         ln -sf "$1-$ver" "$dir/$1"
     else                        # No links
-        mv "$dir/$1" "$dir/$1.$SUFFIX"
+        mv "$dir/$1" "$dir/$1$SUFFIX"
         cat "$2" > "$dir/$1"
     fi
   fi
